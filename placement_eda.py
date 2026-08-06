@@ -1,120 +1,393 @@
 import os
 import pandas as pd
-import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+#
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 from load_data import load_data
-import matplotlib
 
-matplotlib.use("Agg")
-
-sns.set_style("whitegrid")
 CHARTS_DIR = os.path.join(os.path.dirname(__file__), "static", "charts")
 
 
-def _chart_path(filename: str) -> str:
+def _chart_path(filename):
     os.makedirs(CHARTS_DIR, exist_ok=True)
     return os.path.join(CHARTS_DIR, filename)
 
 
-def _save(filename: str):
-    plt.tight_layout()
-    plt.savefig(_chart_path(filename), bbox_inches="tight", dpi=100)
-    plt.close("all")
+def run_eda():
 
-
-# CSV_PATH = r"D:\ML\placement_predict_50k Dataset (3)(in).csv"
-#
-# sns.set_style("whitegrid")
-# pd.set_option("display.max_columns", None)
-# pd.set_option("display.width", 200)
-#
-#
-# def show(title=""):
-#     if title:
-#         plt.suptitle(title)
-#     plt.tight_layout()
-#     plt.show()
-#     plt.show("all")
-#
-#
-# if not os.path.exists(CSV_PATH):
-#     raise FileNotFoundError(f"csv not found at '{CSV_PATH}'.Update CSV_PATH at top of script")
-# data = pd.read_csv(CSV_PATH)
-# print("=" * 80)
-# print("1.DATA Loaded")
-# print("=" * 80)
-# print("Shape:", data.shape)
-# print("\nFirst 5-rows:\n", data.head())
-#
-# print("\n" + "=" * 80)
-# print("2.Basic Info")
-# print("=" * 80)
-# print(data.info())
-# print("\nColumn dtypes:\n", data.dtypes)
-# print("\nDescribe (numeric):\n", data.describe())
-# print("\nDescribe (categorical):\n", data.describe(include="object"))
-# print("\n" + "=" * 80)
-
-
-def run_eda() -> dict:
     data = load_data()
+
     charts = []
-    print("3.Missing values")
-    print("=" * 80)
+
+    sns.set_style("whitegrid")
+
+    # Missing Values
     missing = data.isnull().sum()
-    missing_pct = (missing / len(data)) * 100
-    missing_df = pd.DataFrame({"missing_count": missing, "missing_pct": missing_pct})
-    missing_df = missing_df[missing_df["missing_count"] > 0].sort_values("missing_count", ascending=False)
-    _save("missing_values.png")
-    charts.append("missing_values.png")
+    missing = missing[missing > 0]
 
+    if not missing.empty:
 
+        plt.figure(figsize=(10,5))
+        sns.barplot(x=missing.index, y=missing.values)
 
-    if not missing_df.empty:
-       plt.figure(figsize=(10, 5), dpi=100)
-       sns.barplot(x=missing_df.index, y=missing_df["missing_pct"])
-       plt.xticks(rotation=45, ha="right")
-       plt.ylabel("Missing %")
-       plt.title("Missing Values by columns")
-       _save("missing_values.png")
-       charts.append("missing_values.png")
+        plt.xticks(rotation=45)
+        plt.title("Missing Values")
 
-    print("\n" + "=" * 80)
-    print("4.Duplicate Rows")
-    print("=" * 80)
-    print("Duplicate rows:", data.duplicated().sum())
+        plt.tight_layout()
+        plt.savefig(_chart_path("missing_values.png"))
+        plt.close()
 
+        charts.append("missing_values.png")
 
+        plt.figure(figsize=(12,6))
+        sns.heatmap(data.isnull(), cbar=False)
 
+        plt.title("Missing Value Heatmap")
 
+        plt.tight_layout()
+        plt.savefig(_chart_path("missing_heatmap.png"))
+        plt.close()
 
-    print("\n" + "=" * 80)
-    print("5.Target Variable - Placement status")
-    print("=" * 80)
-    print(data["PlacementStatus"].value_counts())
+        charts.append("missing_heatmap.png")
+
+    duplicates = int(data.duplicated().sum())
+
     target_counts = data["PlacementStatus"].value_counts().to_dict()
 
-    plt.figure(figsize=(6, 4), dpi=125)
-    sns.countplot(x="PlacementStatus", data=data)
-    plt.xlabel("Placement Status")
-    plt.ylabel("Count")
+    plt.figure(figsize=(6,5))
+
+    sns.countplot(
+        x="PlacementStatus",
+        data=data
+    )
+
     plt.title("Placement Status Distribution")
 
-    _save("placement_status.png")
+    plt.tight_layout()
+
+    plt.savefig(_chart_path("placement_status.png"))
+    plt.close()
+
     charts.append("placement_status.png")
 
+
+
+
+    hist_cols = [
+        "CGPA",
+        "AttendancePercent",
+        "AptitudeTestScore",
+        "SoftSkillRating",
+        "CodingTestScore",
+        "MockInterviewScore"
+    ]
+
+    hist_cols = [c for c in hist_cols if c in data.columns]
+
+    if hist_cols:
+
+        data[hist_cols].hist(figsize=(14,10), bins=20)
+
+        plt.tight_layout()
+        plt.savefig(_chart_path("numeric_distributions.png"))
+        plt.close()
+
+        charts.append("numeric_distributions.png")
+
+    if "CGPA" in data.columns:
+
+        plt.figure(figsize=(8,5))
+
+        sns.histplot(data["CGPA"], kde=True)
+
+        plt.axvline(
+            data["CGPA"].mean(),
+            color="green",
+            linestyle="--",
+            label="Mean"
+        )
+
+        plt.legend()
+        plt.title("CGPA Distribution")
+
+        plt.tight_layout()
+        plt.savefig(_chart_path("cgpa_distribution.png"))
+        plt.close()
+
+        charts.append("cgpa_distribution.png")
+
+
+
+
+    box_cols = [
+        "CGPA",
+        "AttendancePercent",
+        "AptitudeTestScore",
+        "SoftSkillRating",
+        "CodingTestScore",
+        "MockInterviewScore",
+        "Salary Package"
+    ]
+
+    box_cols = [c for c in box_cols if c in data.columns]
+
+    for col in box_cols:
+
+        plt.figure(figsize=(8,4))
+
+        sns.boxplot(x=data[col], color="skyblue")
+
+        plt.title(f"Boxplot - {col}")
+
+        plt.tight_layout()
+
+        filename = f"boxplot_{col.replace(' ','_')}.png"
+
+        plt.savefig(_chart_path(filename))
+        plt.close()
+
+        charts.append(filename)
+
+
+
+
+    corr = data.select_dtypes(include="number").corr()
+
+    plt.figure(figsize=(14,10))
+
+    sns.heatmap(
+        corr,
+        annot=True,
+        cmap="coolwarm",
+        fmt=".2f"
+    )
+
+    plt.title("Correlation Heatmap")
+
+    plt.tight_layout()
+    plt.savefig(_chart_path("correlation_heatmap.png"))
+    plt.close()
+
+    charts.append("correlation_heatmap.png")
+
+
+
+
+    if "CGPA" in data.columns and "Salary Package" in data.columns:
+
+        plt.figure(figsize=(8,5))
+
+        sns.regplot(
+            x="CGPA",
+            y="Salary Package",
+            data=data,
+            color="red"
+        )
+
+        plt.title("CGPA vs Salary Package")
+
+        plt.tight_layout()
+        plt.savefig(_chart_path("cgpa_salary.png"))
+        plt.close()
+
+        charts.append("cgpa_salary.png")
+
+
+    if "CodingTestScore" in data.columns and "AptitudeTestScore" in data.columns:
+
+        plt.figure(figsize=(8,5))
+
+        sns.regplot(
+            x="CodingTestScore",
+            y="AptitudeTestScore",
+            data=data,
+            color="red"
+        )
+
+        plt.title("Coding Test Score vs Aptitude Test Score")
+
+        plt.tight_layout()
+        plt.savefig(_chart_path("coding_aptitude.png"))
+        plt.close()
+
+        charts.append("coding_aptitude.png")
+
+
+
+    cat_cols = [
+        "Gender",
+        "City",
+        "CollegeTier",
+        "Stream",
+        "Specialisation",
+        "Hostel",
+        "HistoryOfBacklogs",
+        "CGPA_Tier"
+    ]
+
+    cat_cols = [c for c in cat_cols if c in data.columns]
+
+    for col in cat_cols:
+
+        plt.figure(figsize=(10,5))
+
+        order = data[col].value_counts().index
+
+        sns.countplot(
+            x=col,
+            data=data,
+            order=order
+        )
+
+        plt.xticks(rotation=45)
+
+        plt.title(f"{col} Count")
+
+        plt.tight_layout()
+
+        filename = f"{col.lower()}_count.png"
+
+        plt.savefig(_chart_path(filename))
+        plt.close()
+
+        charts.append(filename)
+
+
+
+    if "Gender" in data.columns and "PlacementStatus" in data.columns:
+
+        plt.figure(figsize=(7,5))
+
+        sns.countplot(
+            x="Gender",
+            hue="PlacementStatus",
+            data=data
+        )
+
+        plt.title("Placement Status by Gender")
+
+        plt.tight_layout()
+        plt.savefig(_chart_path("gender_vs_placement.png"))
+        plt.close()
+
+        charts.append("gender_vs_placement.png")
+
+
+
+    if "CollegeTier" in data.columns and "PlacementStatus" in data.columns:
+
+        plt.figure(figsize=(7,5))
+
+        sns.countplot(
+            x="CollegeTier",
+            hue="PlacementStatus",
+            data=data
+        )
+
+        plt.title("Placement Status by College Tier")
+
+        plt.tight_layout()
+        plt.savefig(_chart_path("college_tier_vs_placement.png"))
+        plt.close()
+
+        charts.append("college_tier_vs_placement.png")
+
+
+
+    sgpa_cols = [
+        f"SGPA_Sem{i}"
+        for i in range(1,9)
+        if f"SGPA_Sem{i}" in data.columns
+    ]
+
+    if sgpa_cols:
+
+        avg_sgpa = data[sgpa_cols].mean()
+
+        plt.figure(figsize=(8,5))
+
+        plt.plot(
+            avg_sgpa.index,
+            avg_sgpa.values,
+            marker="o"
+        )
+
+        plt.title("Average SGPA Across Semesters")
+        plt.xlabel("Semester")
+        plt.ylabel("Average SGPA")
+
+        plt.tight_layout()
+        plt.savefig(_chart_path("sgpa_trend.png"))
+        plt.close()
+
+        charts.append("sgpa_trend.png")
+
+
+    if "Salary Package" in data.columns:
+
+        plt.figure(figsize=(7,5))
+
+        sns.histplot(
+            data["Salary Package"],
+            kde=True
+        )
+
+        plt.title("Salary Package Distribution")
+
+        plt.tight_layout()
+        plt.savefig(_chart_path("salary_distribution.png"))
+        plt.close()
+
+        charts.append("salary_distribution.png")
+
+
+        plt.figure(figsize=(7,5))
+
+        sns.boxplot(
+            x=data["Salary Package"]
+        )
+
+        plt.title("Salary Package Boxplot")
+
+        plt.tight_layout()
+        plt.savefig(_chart_path("salary_boxplot.png"))
+        plt.close()
+
+        charts.append("salary_boxplot.png")
+
+
+    pair_cols = [
+        "CGPA",
+        "AttendancePercent",
+        "PlacementStatus"
+    ]
+
+    pair_cols = [c for c in pair_cols if c in data.columns]
+
+    if len(pair_cols) >= 3:
+
+        sample_data = data[pair_cols].sample(
+            min(500, len(data)),
+            random_state=42
+        )
+
+        g = sns.pairplot(
+            sample_data,
+            hue="PlacementStatus"
+        )
+
+        g.savefig(_chart_path("pairplot.png"))
+        plt.close("all")
+
+        charts.append("pairplot.png")
     return {
-        "n_rows": len(data),
-        "n_cols": len(data.columns),
-        "duplicate_count": int(data.duplicated().sum()),
-        "missing": missing_df["missing_count"].to_dict(),
+        "rows": len(data),
+        "columns": len(data.columns),
+        "duplicates": duplicates,
+        "missing": missing.to_dict(),
         "target_counts": target_counts,
-        "charts": charts,
+        "charts": charts
     }
-
-
-
-if __name__=="__main__":
-    results=run_eda()
-    print(results)
